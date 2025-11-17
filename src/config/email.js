@@ -18,7 +18,13 @@ const getEmailTransporter = () => {
     auth: {
       user: process.env.SMTP_USERNAME,
       pass: process.env.SMTP_PASSWORD
-    }
+    },
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000, // 10 seconds
+    socketTimeout: 10000, // 10 seconds
+    pool: true, // Use connection pooling
+    maxConnections: 1,
+    maxMessages: 3
   });
 
   return transporter;

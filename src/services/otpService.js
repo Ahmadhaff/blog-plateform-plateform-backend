@@ -136,36 +136,63 @@ class OtpService {
   }
 
   async sendEmail(email, code, expiresAt, type) {
-    const transporter = getEmailTransporter();
+    try {
+      const transporter = getEmailTransporter();
 
-    const from = process.env.EMAIL_FROM || process.env.SMTP_USERNAME;
-    if (!from) {
-      throw new Error('EMAIL_FROM or SMTP_USERNAME must be set for sending emails');
+      const from = process.env.EMAIL_FROM || process.env.SMTP_USERNAME;
+      if (!from) {
+        throw new Error('EMAIL_FROM or SMTP_USERNAME must be set for sending emails');
+      }
+
+      const subject = type === OTP_TYPES.PASSWORD_RESET
+        ? 'Reset your password'
+        : 'Your verification code';
+      const purposeLine = type === OTP_TYPES.PASSWORD_RESET
+        ? 'Use this code to reset your password.'
+        : 'Use this code to verify your email address.';
+      const expiresAtDisplay = expiresAt.toLocaleString();
+      const text = `Your verification code is ${code}. ${purposeLine} It expires in ${OTP_EXPIRATION_MINUTES} minutes at ${expiresAtDisplay}.`;
+      const template = await getOtpTemplate();
+      const html = renderOtpTemplate(template, {
+        code,
+        expiresAt: expiresAtDisplay,
+        expiresInMinutes: OTP_EXPIRATION_MINUTES,
+        messageLine: purposeLine
+      });
+
+      // Wrap sendMail in a Promise with timeout
+      const sendMailPromise = transporter.sendMail({
+        from,
+        to: email,
+        subject,
+        text,
+        html
+      });
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Email sending timeout: SMTP server did not respond within 15 seconds'));
+        }, 15000); // 15 second timeout
+      });
+
+      await Promise.race([sendMailPromise, timeoutPromise]);
+    } catch (error) {
+      console.error('❌ Error sending email:', error);
+      
+      // Provide user-friendly error messages
+      if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+        throw createError('Email service timeout. Please check your SMTP configuration or try again later.', 503);
+      }
+      if (error.code === 'ECONNREFUSED') {
+        throw createError('Cannot connect to email server. Please check your SMTP configuration.', 503);
+      }
+      if (error.code === 'EAUTH') {
+        throw createError('Email authentication failed. Please check your SMTP credentials.', 401);
+      }
+      
+      // Re-throw with a generic message
+      throw createError('Failed to send email. Please try again later.', 500);
     }
-
-    const subject = type === OTP_TYPES.PASSWORD_RESET
-      ? 'Reset your password'
-      : 'Your verification code';
-    const purposeLine = type === OTP_TYPES.PASSWORD_RESET
-      ? 'Use this code to reset your password.'
-      : 'Use this code to verify your email address.';
-    const expiresAtDisplay = expiresAt.toLocaleString();
-    const text = `Your verification code is ${code}. ${purposeLine} It expires in ${OTP_EXPIRATION_MINUTES} minutes at ${expiresAtDisplay}.`;
-    const template = await getOtpTemplate();
-    const html = renderOtpTemplate(template, {
-      code,
-      expiresAt: expiresAtDisplay,
-      expiresInMinutes: OTP_EXPIRATION_MINUTES,
-      messageLine: purposeLine
-    });
-
-    await transporter.sendMail({
-      from,
-      to: email,
-      subject,
-      text,
-      html
-    });
   }
 }
 
