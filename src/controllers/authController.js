@@ -41,8 +41,11 @@ const getBaseUrl = (req) => {
   
   // If host contains 'localhost' or '127.0.0.1', use http (development)
   // Otherwise, use https (production)
+  // Force HTTPS if NODE_ENV is production OR if host is from Render.com (.onrender.com)
   const isLocalhost = host && (host.includes('localhost') || host.includes('127.0.0.1'));
-  const isHttps = protocol === 'https' || (!isLocalhost && process.env.NODE_ENV === 'production');
+  const isRender = host && host.includes('.onrender.com');
+  const isProduction = process.env.NODE_ENV === 'production' || isRender;
+  const isHttps = protocol === 'https' || (!isLocalhost && isProduction);
   const finalProtocol = isHttps ? 'https' : 'http';
   
   return `${finalProtocol}://${host}`;
