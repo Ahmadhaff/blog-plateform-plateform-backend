@@ -7,6 +7,7 @@ const { getEmailTransporter } = require('../config/email');
 const { createError } = require('../utils/errors');
 const { OTP_TYPES } = require('../enums');
 const { generateAccessToken } = require('../utils/helpers');
+const { Resend } = require('resend');
 
 const OTP_EXPIRATION_MINUTES = Number(process.env.OTP_EXPIRATION_MINUTES) || 10;
 const OTP_TEMPLATE_PATH = path.join(__dirname, '../templates/otpEmail.html');
@@ -137,8 +138,6 @@ class OtpService {
 
   async sendEmail(email, code, expiresAt, type) {
     try {
-      const transporter = getEmailTransporter();
-
       const from = process.env.EMAIL_FROM || process.env.SMTP_USERNAME;
       if (!from) {
         throw new Error('EMAIL_FROM or SMTP_USERNAME must be set for sending emails');
@@ -159,6 +158,30 @@ class OtpService {
         expiresInMinutes: OTP_EXPIRATION_MINUTES,
         messageLine: purposeLine
       });
+
+      // Use Resend API if API key is available (more reliable than SMTP)
+      if (process.env.RESEND_API_KEY) {
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        
+        const result = await resend.emails.send({
+          from: from,
+          to: email,
+          subject: subject,
+          text: text,
+          html: html
+        });
+
+        if (result.error) {
+          console.error('❌ Resend API error:', result.error);
+          throw createError('Failed to send email via Resend. Please check your configuration.', 500);
+        }
+
+        console.log('✅ Email sent via Resend API:', result.data?.id);
+        return;
+      }
+
+      // Fallback to SMTP
+      const transporter = getEmailTransporter();
 
       // Wrap sendMail in a Promise with timeout
       const sendMailPromise = transporter.sendMail({
