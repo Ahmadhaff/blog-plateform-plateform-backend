@@ -24,7 +24,13 @@ const getEmailTransporter = () => {
     socketTimeout: 10000, // 10 seconds
     pool: true, // Use connection pooling
     maxConnections: 1,
-    maxMessages: 3
+    maxMessages: 3,
+    // For Gmail, try to use STARTTLS if secure is false
+    requireTLS: process.env.SMTP_SECURE !== 'true',
+    tls: {
+      // Don't reject unauthorized certificates (some SMTP servers use self-signed)
+      rejectUnauthorized: false
+    }
   });
 
   return transporter;
