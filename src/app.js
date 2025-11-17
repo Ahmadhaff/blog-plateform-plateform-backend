@@ -20,7 +20,8 @@ app.use(helmet({
 const defaultOrigins = [
   'http://localhost:4200', // Main frontend (Angular)
   'http://localhost:4201', // Admin panel frontend (Angular)
-  'https://blogplateform.netlify.app' // Production frontend
+  'https://blogplateform.netlify.app', // Production main frontend
+  'https://adminpanelblogapp.netlify.app' // Production admin panel frontend
 ];
 const envOrigins = [
   process.env.CLIENT_URL,
