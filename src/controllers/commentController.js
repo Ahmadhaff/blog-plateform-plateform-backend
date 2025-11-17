@@ -9,12 +9,17 @@ const getBaseUrl = (req) => {
     return process.env.APP_BASE_URL.replace(/\/$/, '');
   }
   
-  // In production, prefer HTTPS. Check for X-Forwarded-Proto header (from proxies like Render)
+  // In production, always use HTTPS. Check for X-Forwarded-Proto header (from proxies like Render)
   const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-  const isHttps = protocol === 'https' || process.env.NODE_ENV === 'production';
+  const host = req.get('host');
+  
+  // If host contains 'localhost' or '127.0.0.1', use http (development)
+  // Otherwise, use https (production)
+  const isLocalhost = host && (host.includes('localhost') || host.includes('127.0.0.1'));
+  const isHttps = protocol === 'https' || (!isLocalhost && process.env.NODE_ENV === 'production');
   const finalProtocol = isHttps ? 'https' : 'http';
   
-  return `${finalProtocol}://${req.get('host')}`;
+  return `${finalProtocol}://${host}`;
 };
 
 // Format comment response with full avatar URL
