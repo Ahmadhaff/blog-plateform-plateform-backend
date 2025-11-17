@@ -161,23 +161,31 @@ class OtpService {
 
       // Use Resend API if API key is available (more reliable than SMTP)
       if (process.env.RESEND_API_KEY) {
-        const resend = new Resend(process.env.RESEND_API_KEY);
-        
-        const result = await resend.emails.send({
-          from: from,
-          to: email,
-          subject: subject,
-          text: text,
-          html: html
-        });
+        try {
+          const resend = new Resend(process.env.RESEND_API_KEY);
+          
+          console.log('📧 Attempting to send email via Resend API to:', email);
+          
+          const result = await resend.emails.send({
+            from: from,
+            to: email,
+            subject: subject,
+            text: text,
+            html: html
+          });
 
-        if (result.error) {
-          console.error('❌ Resend API error:', result.error);
-          throw createError('Failed to send email via Resend. Please check your configuration.', 500);
+          if (result.error) {
+            console.error('❌ Resend API error:', JSON.stringify(result.error, null, 2));
+            throw createError(`Failed to send email via Resend: ${result.error.message || 'Unknown error'}`, 500);
+          }
+
+          console.log('✅ Email sent via Resend API:', result.data?.id);
+          return;
+        } catch (error) {
+          console.error('❌ Resend API exception:', error);
+          // If Resend fails, don't fall through to SMTP - throw the error
+          throw createError(`Resend API error: ${error.message || 'Unable to send email'}`, 500);
         }
-
-        console.log('✅ Email sent via Resend API:', result.data?.id);
-        return;
       }
 
       // Fallback to SMTP
