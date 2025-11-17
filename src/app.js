@@ -30,12 +30,20 @@ const allowedOrigins = [...new Set([...envOrigins, ...defaultOrigins])];
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) {
       return callback(null, true);
     }
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    console.log(`❌ CORS: Blocked origin: ${origin}`);
+    console.log(`✅ Allowed origins:`, allowedOrigins);
     return callback(new Error('Not allowed by CORS'));
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 app.use(compression());
 app.use(morgan('dev'));
@@ -62,6 +70,14 @@ app.get('/health', (req, res) => {
 app.use((err, req, res, next) => {
   console.error(err);
   const status = err.statusCode || err.status || 500;
+  
+  // Ensure CORS headers are set even on errors
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  
   res.status(status).json({ error: err.message || 'Internal server error' });
 });
 
