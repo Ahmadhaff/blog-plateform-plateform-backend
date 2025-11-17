@@ -135,8 +135,30 @@ process.on('uncaughtException', (err) => {
 
 async function startServer() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
-    console.log('✅ MongoDB connected');
+    const mongoUri = process.env.MONGODB_URI;
+    if (!mongoUri) {
+      throw new Error('MONGODB_URI environment variable is not set');
+    }
+    
+    // Extract database name for logging
+    let dbName = 'default';
+    const match = mongoUri.match(/\/([^?\/]+)(\?|$)/);
+    if (match && match[1] && match[1] !== '') {
+      dbName = match[1];
+    }
+    
+    console.log(`🔗 Connecting to MongoDB...`);
+    console.log(`📍 Database: ${dbName || 'default (will use default database)'}`);
+    
+    await mongoose.connect(mongoUri);
+    
+    const connectedDbName = mongoose.connection.name;
+    const collections = Object.keys(mongoose.connection.collections);
+    
+    console.log(`✅ MongoDB Connected:`);
+    console.log(`   Host: ${mongoose.connection.host}`);
+    console.log(`   Database: ${connectedDbName}`);
+    console.log(`   Collections: ${collections.length} collections available`);
 
     // Don't fail server startup if Redis/RabbitMQ fail
     try {
