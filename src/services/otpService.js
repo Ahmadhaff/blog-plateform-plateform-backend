@@ -7,7 +7,6 @@ const { getEmailTransporter } = require('../config/email');
 const { createError } = require('../utils/errors');
 const { OTP_TYPES } = require('../enums');
 const { generateAccessToken } = require('../utils/helpers');
-const { Resend } = require('resend');
 
 const OTP_EXPIRATION_MINUTES = Number(process.env.OTP_EXPIRATION_MINUTES) || 10;
 const OTP_TEMPLATE_PATH = path.join(__dirname, '../templates/otpEmail.html');
@@ -159,57 +158,7 @@ class OtpService {
         messageLine: purposeLine
       });
 
-      // Use Resend API if API key is available (more reliable than SMTP)
-      if (process.env.RESEND_API_KEY) {
-        try {
-          const resend = new Resend(process.env.RESEND_API_KEY);
-          
-          console.log('📧 Attempting to send email via Resend API to:', email);
-          console.log('📧 From address:', from);
-          
-          const result = await resend.emails.send({
-            from: from,
-            to: [email], // Resend requires 'to' to be an array
-            subject: subject,
-            text: text,
-            html: html
-          });
-
-          if (result.error) {
-            console.error('❌ Resend API error:', JSON.stringify(result.error, null, 2));
-            
-            // Provide specific error messages for common issues
-            if (result.error.message && result.error.message.includes('not verified')) {
-              throw createError('Email domain not verified in Resend. Please verify your domain at https://resend.com/domains', 400);
-            }
-            if (result.error.name === 'validation_error') {
-              throw createError(`Resend validation error: ${result.error.message}`, 400);
-            }
-            
-            throw createError(`Failed to send email via Resend: ${result.error.message || 'Unknown error'}`, 500);
-          }
-
-          console.log('✅ Email sent via Resend API:', result.data?.id);
-          return;
-        } catch (error) {
-          console.error('❌ Resend API exception:', error);
-          
-          // Check if it's already an AppError (from above)
-          if (error.statusCode) {
-            throw error;
-          }
-          
-          // Handle network errors
-          if (error.message && error.message.includes('fetch') || error.message.includes('resolve')) {
-            throw createError('Cannot connect to Resend API. Please check your network connection or try again later.', 503);
-          }
-          
-          // If Resend fails, don't fall through to SMTP - throw the error
-          throw createError(`Resend API error: ${error.message || 'Unable to send email'}`, 500);
-        }
-      }
-
-      // Fallback to SMTP
+      // Use SMTP (Gmail or other SMTP server)
       const transporter = getEmailTransporter();
 
       // Wrap sendMail in a Promise with timeout

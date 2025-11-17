@@ -7,31 +7,9 @@ const getEmailTransporter = () => {
     return transporter;
   }
 
-  // Support for Resend (cloud email service) - more reliable than Gmail from cloud providers
-  if (process.env.RESEND_API_KEY) {
-    transporter = nodemailer.createTransport({
-      host: 'smtp.resend.com',
-      port: 587,
-      secure: false, // Use STARTTLS
-      auth: {
-        user: 'resend',
-        pass: process.env.RESEND_API_KEY
-      },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
-      requireTLS: true,
-      tls: {
-        rejectUnauthorized: false
-      }
-    });
-    console.log('✅ Using Resend email service');
-    return transporter;
-  }
-
-  // Fallback to SMTP configuration
+  // SMTP configuration (Gmail or other SMTP server)
   if (!process.env.SMTP_HOST) {
-    throw new Error('SMTP_HOST or RESEND_API_KEY environment variable must be set');
+    throw new Error('SMTP_HOST environment variable must be set');
   }
 
   transporter = nodemailer.createTransport({
