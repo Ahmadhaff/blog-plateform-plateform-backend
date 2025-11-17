@@ -67,8 +67,9 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Global error handler - must be before 404 handler
 app.use((err, req, res, next) => {
-  console.error(err);
+  console.error('❌ Error:', err);
   const status = err.statusCode || err.status || 500;
   
   // Ensure CORS headers are set even on errors
@@ -76,29 +77,75 @@ app.use((err, req, res, next) => {
   if (origin && allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
   }
   
-  res.status(status).json({ error: err.message || 'Internal server error' });
+  // Don't send error details in production
+  const errorMessage = process.env.NODE_ENV === 'production' 
+    ? 'Internal server error' 
+    : err.message || 'Internal server error';
+  
+  res.status(status).json({ error: errorMessage });
 });
 
+// 404 handler
 app.use((req, res) => {
+  // Set CORS headers for 404 as well
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
   res.status(404).json({ error: 'Route not found' });
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  console.error('❌ Unhandled Promise Rejection:', err);
+  // Don't exit in production, let the server continue
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err);
+  // Don't exit in production, let the server continue
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
 });
 
 async function startServer() {
   try {
     await mongoose.connect(process.env.MONGODB_URI);
-    // MongoDB connected
+    console.log('✅ MongoDB connected');
 
-    await connectRedis();
-    await connectRabbitMQ();
+    // Don't fail server startup if Redis/RabbitMQ fail
+    try {
+      await connectRedis();
+    } catch (redisError) {
+      console.error('⚠️ Redis connection failed, continuing without Redis:', redisError.message);
+    }
 
-    // Initialize OneSignal
-    initializeOneSignal();
+    try {
+      await connectRabbitMQ();
+    } catch (rabbitError) {
+      console.error('⚠️ RabbitMQ connection failed, continuing without RabbitMQ:', rabbitError.message);
+    }
+
+    // Initialize OneSignal (non-blocking)
+    try {
+      initializeOneSignal();
+    } catch (onesignalError) {
+      console.error('⚠️ OneSignal initialization failed:', onesignalError.message);
+    }
 
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
-      // Server running
+      console.log(`🚀 Platform Server running on port ${PORT}`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
