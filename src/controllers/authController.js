@@ -1,6 +1,5 @@
 const authService = require('../services/authService');
 const { createError } = require('../utils/errors');
-const otpService = require('../services/otpService');
 
 const register = async (req, res, next) => {
   try {
@@ -97,30 +96,6 @@ const logout = async (req, res, next) => {
   }
 };
 
-const sendOtp = async (req, res, next) => {
-  try {
-    const { email, type } = req.body;
-    const result = await otpService.sendOtp(email, type);
-    res.json(result);
-  } catch (error) {
-    next(error);
-  }
-};
-
-const verifyOtp = async (req, res, next) => {
-  try {
-    const {
-      email,
-      code,
-      type
-    } = req.body;
-    const result = await otpService.verifyOtp(email, code, type);
-    res.json(result);
-  } catch (error) {
-    next(error);
-  }
-};
-
 const resetPassword = async (req, res, next) => {
   try {
     const {
@@ -159,8 +134,6 @@ module.exports = {
   login,
   refreshToken,
   logout,
-  sendOtp,
-  verifyOtp,
   resetPassword,
   changePassword
 };

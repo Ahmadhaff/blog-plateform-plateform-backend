@@ -1,5 +1,4 @@
 const { body, validationResult } = require('express-validator');
-const { OTP_TYPES } = require('../enums');
 
 const registerValidator = [
   body('username')
@@ -17,29 +16,6 @@ const registerValidator = [
     .bail()
     .isIn(['Rédacteur', 'Lecteur'])
     .withMessage('Invalid role value')
-];
-
-const sendOtpValidator = [
-  body('email')
-    .isEmail()
-    .withMessage('Valid email is required'),
-  body('type')
-    .optional()
-    .isIn(Object.values(OTP_TYPES))
-    .withMessage('Invalid OTP type')
-];
-
-const verifyOtpValidator = [
-  body('email')
-    .isEmail()
-    .withMessage('Valid email is required'),
-  body('code')
-    .isLength({ min: 6, max: 6 })
-    .withMessage('OTP code must be 6 digits'),
-  body('type')
-    .optional()
-    .isIn(Object.values(OTP_TYPES))
-    .withMessage('Invalid OTP type')
 ];
 
 const resetPasswordValidator = [
@@ -180,8 +156,6 @@ module.exports = {
   updateArticleValidator,
   createCommentValidator,
   updateCommentValidator,
-  sendOtpValidator,
-  verifyOtpValidator,
   resetPasswordValidator,
   changePasswordValidator,
   validate

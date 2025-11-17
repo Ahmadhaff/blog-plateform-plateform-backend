@@ -18,7 +18,12 @@ class AuthService {
       throw createError('Invalid role for signup', 403);
     }
 
-    const user = await User.create(payload);
+    // Set verified and isActive to true directly (no OTP verification needed)
+    const user = await User.create({
+      ...payload,
+      verified: true,
+      isActive: true
+    });
 
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
@@ -39,10 +44,6 @@ class AuthService {
     const user = await User.findOne({ email });
     if (!user) {
       throw createError('Invalid credentials', 401);
-    }
-
-    if (!user.verified) {
-      throw createError('Email not verified', 403);
     }
 
     if (!user.isActive) {
