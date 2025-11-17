@@ -165,6 +165,7 @@ class OtpService {
           const resend = new Resend(process.env.RESEND_API_KEY);
           
           console.log('📧 Attempting to send email via Resend API to:', email);
+          console.log('📧 From address:', from);
           
           const result = await resend.emails.send({
             from: from,
@@ -176,6 +177,15 @@ class OtpService {
 
           if (result.error) {
             console.error('❌ Resend API error:', JSON.stringify(result.error, null, 2));
+            
+            // Provide specific error messages for common issues
+            if (result.error.message && result.error.message.includes('not verified')) {
+              throw createError('Email domain not verified in Resend. Please verify your domain at https://resend.com/domains', 400);
+            }
+            if (result.error.name === 'validation_error') {
+              throw createError(`Resend validation error: ${result.error.message}`, 400);
+            }
+            
             throw createError(`Failed to send email via Resend: ${result.error.message || 'Unknown error'}`, 500);
           }
 
@@ -183,6 +193,17 @@ class OtpService {
           return;
         } catch (error) {
           console.error('❌ Resend API exception:', error);
+          
+          // Check if it's already an AppError (from above)
+          if (error.statusCode) {
+            throw error;
+          }
+          
+          // Handle network errors
+          if (error.message && error.message.includes('fetch') || error.message.includes('resolve')) {
+            throw createError('Cannot connect to Resend API. Please check your network connection or try again later.', 503);
+          }
+          
           // If Resend fails, don't fall through to SMTP - throw the error
           throw createError(`Resend API error: ${error.message || 'Unable to send email'}`, 500);
         }

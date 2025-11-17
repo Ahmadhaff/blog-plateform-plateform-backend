@@ -35,7 +35,13 @@ const getBaseUrl = (req) => {
   if (process.env.APP_BASE_URL) {
     return process.env.APP_BASE_URL.replace(/\/$/, '');
   }
-  return `${req.protocol}://${req.get('host')}`;
+  
+  // In production, prefer HTTPS. Check for X-Forwarded-Proto header (from proxies like Render)
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+  const isHttps = protocol === 'https' || process.env.NODE_ENV === 'production';
+  const finalProtocol = isHttps ? 'https' : 'http';
+  
+  return `${finalProtocol}://${req.get('host')}`;
 };
 
 const formatUserResponse = (req, user) => {
