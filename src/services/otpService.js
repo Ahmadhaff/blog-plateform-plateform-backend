@@ -168,7 +168,7 @@ class OtpService {
           
           const result = await resend.emails.send({
             from: from,
-            to: email,
+            to: [email], // Resend requires 'to' to be an array
             subject: subject,
             text: text,
             html: html
