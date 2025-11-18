@@ -4,39 +4,21 @@ const { createError } = require('../utils/errors');
 const { uploadFile, deleteFile, getFileStream } = require('../config/gridfs');
 
 const getBaseUrl = (req) => {
-  // Always use APP_BASE_URL if set (recommended for production)
+  // Use APP_BASE_URL if set (recommended for production)
   if (process.env.APP_BASE_URL) {
     return process.env.APP_BASE_URL.replace(/\/$/, '');
   }
   
-  // Check if we're running on Render.com (production)
-  // Render.com sets RENDER environment variable, or we can check for .onrender.com in host
-  const host = req.headers['x-forwarded-host'] || req.get('host') || '';
-  const isRender = process.env.RENDER === 'true' || host.includes('.onrender.com');
-  const isProduction = process.env.NODE_ENV === 'production' || isRender;
-  
-  // If we're in production, always use the Render.com URL, never localhost
-  if (isProduction) {
-    const serviceName = process.env.RENDER_SERVICE_NAME || 'blog-plateform-plateform-backend';
-    const productionHost = `${serviceName}.onrender.com`;
-    
-    // If host is localhost or not the production host, log and use production URL
-    if (!host || host.includes('localhost') || host.includes('127.0.0.1') || !host.includes('.onrender.com')) {
-      console.log(`⚠️ [getBaseUrl] Production detected but host was '${host}', using: https://${productionHost}`);
-      return `https://${productionHost}`;
-    }
-    
-    // Host is already correct production host, ensure HTTPS
+  // Production mode - use HTTPS
+  if (process.env.NODE_ENV === 'production') {
+    const host = req.headers['x-forwarded-host'] || req.get('host') || 'blog-plateform-plateform-backend.onrender.com';
     return `https://${host}`;
   }
   
-  // Development mode - use request protocol and host
-  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-  const finalHost = host || 'localhost:3000';
-  const isHttps = protocol === 'https';
-  const finalProtocol = isHttps ? 'https' : 'http';
-  
-  return `${finalProtocol}://${finalHost}`;
+  // Development mode - use HTTP localhost
+  const protocol = req.protocol || 'http';
+  const host = req.get('host') || 'localhost:3000';
+  return `${protocol}://${host}`;
 };
 
 const formatUserResponse = (req, user) => {
