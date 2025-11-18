@@ -11,7 +11,8 @@ const getBaseUrl = (req) => {
   
   // In production, always use HTTPS. Check for X-Forwarded-Proto header (from proxies like Render)
   const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-  const host = req.get('host');
+  // Use X-Forwarded-Host if available (from proxies like Render), otherwise use host header
+  const host = req.headers['x-forwarded-host'] || req.get('host');
   
   // If host contains 'localhost' or '127.0.0.1', use http (development)
   // Otherwise, use https (production)
@@ -19,10 +20,43 @@ const getBaseUrl = (req) => {
   const isLocalhost = host && (host.includes('localhost') || host.includes('127.0.0.1'));
   const isRender = host && host.includes('.onrender.com');
   const isProduction = process.env.NODE_ENV === 'production' || isRender;
-  const isHttps = protocol === 'https' || (!isLocalhost && isProduction);
+  
+  // If host is localhost but we're in production, use the forwarded host
+  let finalHost = host;
+  if (isLocalhost && isProduction) {
+    // In production but host is localhost - try to get real host from forwarded headers
+    // Prefer X-Forwarded-Host (from Render.com proxy), then try other headers
+    finalHost = req.headers['x-forwarded-host'] || 
+                req.headers.host || 
+                host;
+    
+    // If still localhost, try to extract from request URL or use known production pattern
+    if (finalHost && finalHost.includes('localhost')) {
+      // Try to get host from the request URL if available
+      // Or construct from known Render.com pattern if we detect it's a Render deployment
+      if (process.env.RENDER) {
+        // Running on Render.com - construct URL from service name
+        const serviceName = process.env.RENDER_SERVICE_NAME || 'blog-plateform-plateform-backend';
+        finalHost = `${serviceName}.onrender.com`;
+      } else {
+        // Not on Render - log warning and use HTTPS with localhost (will fail but prevents Mixed Content)
+        console.warn('⚠️ [getBaseUrl] Detected localhost in production environment. Please set APP_BASE_URL. Host:', host, 'Headers:', {
+          'x-forwarded-host': req.headers['x-forwarded-host'],
+          'x-forwarded-proto': req.headers['x-forwarded-proto'],
+          origin: req.headers.origin,
+          referer: req.headers.referer
+        });
+        // Keep localhost but will force HTTPS below
+        finalHost = host;
+      }
+    }
+  }
+  
+  // Force HTTPS in production, regardless of localhost detection
+  const isHttps = protocol === 'https' || (!isLocalhost && isProduction) || (isLocalhost && isProduction);
   const finalProtocol = isHttps ? 'https' : 'http';
   
-  return `${finalProtocol}://${host}`;
+  return `${finalProtocol}://${finalHost}`;
 };
 
 const formatArticleResponse = (req, articleDoc) => {
