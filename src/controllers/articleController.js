@@ -10,30 +10,31 @@ const getBaseUrl = (req) => {
     return process.env.APP_BASE_URL.replace(/\/$/, '');
   }
   
-  // In production, always use HTTPS. Check for X-Forwarded-Proto header (from proxies like Render)
-  const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-  // Use X-Forwarded-Host if available (from Render.com proxy), otherwise use host header
-  const host = req.headers['x-forwarded-host'] || req.get('host');
+  // Check if we're running on Render.com (production)
+  // Render.com sets RENDER environment variable, or we can check for .onrender.com in host
+  const host = req.headers['x-forwarded-host'] || req.get('host') || '';
+  const isRender = process.env.RENDER === 'true' || host.includes('.onrender.com');
+  const isProduction = process.env.NODE_ENV === 'production' || isRender;
   
-  // If host contains 'localhost' or '127.0.0.1', it's development
-  const isLocalhost = host && (host.includes('localhost') || host.includes('127.0.0.1'));
-  
-  // If host is localhost but we're in production (NODE_ENV=production or Render.com), use Render.com URL
-  let finalHost = host;
-  if (isLocalhost && (process.env.NODE_ENV === 'production' || process.env.RENDER)) {
-    // Running on Render.com - construct URL from service name or use default
+  // If we're in production, always use the Render.com URL, never localhost
+  if (isProduction) {
     const serviceName = process.env.RENDER_SERVICE_NAME || 'blog-plateform-plateform-backend';
-    finalHost = `${serviceName}.onrender.com`;
-    console.log('⚠️ [getBaseUrl] Host was localhost in production, using:', finalHost);
+    const productionHost = `${serviceName}.onrender.com`;
+    
+    // If host is localhost or not the production host, log and use production URL
+    if (!host || host.includes('localhost') || host.includes('127.0.0.1') || !host.includes('.onrender.com')) {
+      console.log(`⚠️ [getBaseUrl] Production detected but host was '${host}', using: https://${productionHost}`);
+      return `https://${productionHost}`;
+    }
+    
+    // Host is already correct production host, ensure HTTPS
+    return `https://${host}`;
   }
   
-  // Force HTTPS if:
-  // 1. Protocol is already https, OR
-  // 2. Not localhost and in production, OR
-  // 3. Host contains .onrender.com (always HTTPS on Render)
-  const isRenderHost = finalHost && finalHost.includes('.onrender.com');
-  const isProduction = process.env.NODE_ENV === 'production' || isRenderHost || process.env.RENDER;
-  const isHttps = protocol === 'https' || (!isLocalhost && isProduction) || isRenderHost;
+  // Development mode - use request protocol and host
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  const finalHost = host || 'localhost:3000';
+  const isHttps = protocol === 'https';
   const finalProtocol = isHttps ? 'https' : 'http';
   
   return `${finalProtocol}://${finalHost}`;
